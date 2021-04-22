@@ -4,12 +4,15 @@
 //
 //  Created by Ularbek Abdyrazakov on 29.01.2021.
 //
-
+import RealmSwift
 import UIKit
 
-class TableViewController: UITableViewController {
+class TableViewController: UITableViewController,UISearchBarDelegate {
     
+   private let realm = try! Realm()
+   private var ToDoItems = [TaskList]()
     
+
     
     @IBAction func pushEditAction(_ sender: Any) {
         tableView.setEditing(!tableView.isEditing, animated: true)
@@ -28,11 +31,26 @@ class TableViewController: UITableViewController {
             textField.placeholder = "New item name"
         }
         
-        let alertAction2 = UIAlertAction(title: "create", style: .cancel) { (alert) in
-            let newItem = alertController.textFields![0].text
+        let alertAction2 = UIAlertAction(title: "create", style: .cancel) { [self] (alert) in
+            
+            if let newItems = alertController.textFields![0].text, !newItems.isEmpty {
+                
+                
+                realm.beginWrite()
+                let newItem = TaskList()
+                newItem.name = newItems
+                
+                newItem.completed = false
+               
+                realm.add(newItem)
+                try! realm.commitWrite()
+                
+                
+            }
+            
+            
              
-             addItem(nameItem: newItem!)
-             self.tableView.reloadData()
+             
         }
         let alertAction1 = UIAlertAction(title: "cancel", style: .default) { (alert) in
            
@@ -40,6 +58,7 @@ class TableViewController: UITableViewController {
         }
         alertController.addAction(alertAction1)
         alertController.addAction(alertAction2)
+        self.tableView.reloadData()
         present(alertController, animated: true, completion: nil)
         
         
@@ -48,15 +67,13 @@ class TableViewController: UITableViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-
+        
+        ToDoItems = realm.objects(TaskList.self).map({ $0 })
+        self.tableView.reloadData()
         
         tableView.tableFooterView = UIView()
         tableView.backgroundColor = UIColor.systemOrange
-        // Uncomment the following line to preserve selection between presentations
-        // self.clearsSelectionOnViewWillAppear = false
-
-        // Uncomment the following line to display an Edit button in the navigation bar for this view controller.
-        // self.navigationItem.rightBarButtonItem = self.editButtonItem
+       
     }
 
     // MARK: - Table view data source
@@ -76,9 +93,9 @@ class TableViewController: UITableViewController {
         let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
         
         let currentItem = ToDoItems[indexPath.row]
-        cell.textLabel?.text = (currentItem["Name"] as? String)
+        cell.textLabel?.text = currentItem.name
         
-        if (currentItem["isCompleted"] as? Bool) == true {
+        if currentItem.completed == true {
             cell.imageView?.image = #imageLiteral(resourceName: "check")
             }
         else{
@@ -87,12 +104,12 @@ class TableViewController: UITableViewController {
         
         
         if tableView.isEditing{
-            cell.textLabel?.alpha = 0.4
-            cell.imageView?.alpha = 0.4
+            cell.textLabel?.alpha = 2
+            cell.imageView?.alpha = 2
 
         }else{
-            cell.textLabel?.alpha = 1
-            cell.imageView?.alpha = 1
+            cell.textLabel?.alpha = 4
+            cell.imageView?.alpha = 4
         }
         
         
@@ -114,44 +131,55 @@ class TableViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
         if editingStyle == .delete {
             // Delete the row from the data source
-            removeItem(at: indexPath.row)
-            tableView.deleteRows(at: [indexPath], with: .fade)
-        } else if editingStyle == .insert {
-            // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
-        }    
+            
+            let item = ToDoItems[indexPath.row]
+            try! self.realm.write({
+                self.realm.delete(item)
+            })
+            
+            tableView.deleteRows(at: [indexPath], with: .automatic)
+        } else if editingStyle == .insert {}
     }
+//    override func tableView(_ tableView: UITableView, commit editingStyle: UITableViewCell.EditingStyle, forRowAt indexPath: IndexPath) {
+//        if editingStyle == .delete {
+//            // Delete the row from the data source
+////            removeItem(at: indexPath.row)
+//            tableView.deleteRows(at: [indexPath], with: .fade)
+//        } else if editingStyle == .insert {
+//            // Create a new instance of the appropriate class, insert it into the array, and add a new row to the table view
+//        }
+//    }
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         
-        if changeState(at: indexPath.row) {
-            tableView.cellForRow(at: indexPath)?.imageView?.image = #imageLiteral(resourceName: "check")
-        }
-        else{
-            tableView.cellForRow(at: indexPath)?.imageView?.image = #imageLiteral(resourceName: "iconfinder_uncheck_4473001")
+        
+        let state = ToDoItems[indexPath.row]
+        
+        try!self.realm.write({
+            state.completed = !state.completed
+            
+        })
+        
+        tableView.reloadRows(at: [indexPath], with: .automatic)
+        
 
-        }
-        
-        
     }
 
     
     // Override to support rearranging the table view.
-    override func tableView(_ tableView: UITableView, moveRowAt fromIndexPath: IndexPath, to: IndexPath) {
-        
-        moveItem(fromIndex: fromIndexPath.row, toIndex: to.row)
-        
-        tableView.reloadData()
-    }
     
-    override func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
-        if tableView.isEditing{
-            return .none
-        }
-        else{
-            return .delete
-        }
-    }
+//    override func tableView(_ tableView: UITableView, editingStyleForRowAt indexPath: IndexPath) -> UITableViewCell.EditingStyle {
+//        if tableView.isEditing{
+//            return .none
+//        }
+//        else{
+//            return .delete
+//        }
+//    }
+    
+ 
+
     
     override func tableView(_ tableView: UITableView, shouldIndentWhileEditingRowAt indexPath: IndexPath) -> Bool {
         return false
@@ -174,5 +202,13 @@ class TableViewController: UITableViewController {
         // Pass the selected object to the new view controller.
     }
     */
-
+   
+//    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+//
+//
+//        var arrayy = ToDoItems.values
+//
+//        }
 }
+    
+
